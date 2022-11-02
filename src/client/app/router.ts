@@ -7,6 +7,7 @@ import { siteDataRef } from './data'
 
 export interface Route {
   path: string
+  search: string
   data: PageData
   component: Component | null
 }
@@ -25,6 +26,7 @@ const fakeHost = `http://a.com`
 const getDefaultRoute = (): Route => ({
   path: '/',
   component: null,
+  search: '',
   data: notFoundPageData
 })
 
@@ -75,6 +77,7 @@ export function createRouter(
         }
 
         route.path = inBrowser ? pendingPath : withBase(pendingPath)
+        route.search = targetLoc.search
         route.component = markRaw(comp)
         route.data = import.meta.env.PROD
           ? markRaw(__pageData)
