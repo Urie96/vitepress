@@ -1,5 +1,5 @@
 <script lang="ts" setup>
-import { useSidebar } from '../composables/sidebar'
+import { useSidebar } from '../composables/sidebar.js'
 import VPNavBarTitle from './VPNavBarTitle.vue'
 import VPNavBarSearch from './VPNavBarSearch.vue'
 import VPNavBarMenu from './VPNavBarMenu.vue'
@@ -57,10 +57,6 @@ const { hasSidebar } = useSidebar()
   pointer-events: none;
 }
 
-.VPNavBar .container:deep(*) {
-  pointer-events: all;
-}
-
 @media (min-width: 768px) {
   .VPNavBar {
     padding: 0 32px;
@@ -102,6 +98,10 @@ const { hasSidebar } = useSidebar()
   margin: 0 auto;
   max-width: calc(var(--vp-layout-max-width) - 64px);
   pointer-events: none;
+}
+
+.container :deep(*) {
+  pointer-events: auto;
 }
 
 .content {

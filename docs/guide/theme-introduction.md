@@ -10,6 +10,7 @@ VitePress comes with its default theme providing many features out of the box. L
 - [Layout](./theme-layout)
 - [Home Page](./theme-home-page)
 - [Team Page](./theme-team-page)
+- [Badge](./theme-badge)
 - [Footer](./theme-footer)
 - [Search](./theme-search)
 - [Carbon Ads](./theme-carbon-ads)
@@ -31,13 +32,14 @@ You can enable a custom theme by adding the `.vitepress/theme/index.js` or `.vit
 └─ package.json
 ```
 
-A VitePress custom theme is simply an object containing three properties and is defined as follows:
+A VitePress custom theme is simply an object containing four properties and is defined as follows:
 
 ```ts
 interface Theme {
   Layout: Component // Vue 3 component
   NotFound?: Component
   enhanceApp?: (ctx: EnhanceAppContext) => void
+  setup?: () => void
 }
 
 interface EnhanceAppContext {
@@ -64,6 +66,11 @@ export default {
     // app is the Vue 3 app instance from `createApp()`.
     // router is VitePress' custom router. `siteData` is
     // a `ref` of current site-level metadata.
+  },
+
+  setup() {
+    // this function will be executed inside VitePressApp's
+    // setup hook. all composition APIs are available here.
   }
 }
 ```
@@ -103,9 +110,12 @@ import DefaultTheme from 'vitepress/theme'
 
 export default {
   ...DefaultTheme,
-  enhanceApp({ app }) {
-    // register global components
-    app.component('MyGlobalComponent', /* ... */)
+  enhanceApp(ctx) {
+    // extend default theme custom behaviour.
+    DefaultTheme.enhanceApp(ctx)
+
+    // register your custom global components
+    ctx.app.component('MyGlobalComponent' /* ... */)
   }
 }
 ```

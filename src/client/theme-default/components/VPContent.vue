@@ -1,19 +1,16 @@
 <script setup lang="ts">
 import { useRoute, useData } from 'vitepress'
-import { useCopyCode } from '../composables/copy-code'
-import { useSidebar } from '../composables/sidebar'
-import Theme from '/@theme/index'
+import { useSidebar } from '../composables/sidebar.js'
 import VPPage from './VPPage.vue'
 import VPHome from './VPHome.vue'
 import VPDoc from './VPDoc.vue'
+import { inject } from 'vue'
 
 const route = useRoute()
 const { frontmatter } = useData()
 const { hasSidebar } = useSidebar()
 
-const NotFound = Theme.NotFound || (() => '404 Not Found')
-
-useCopyCode()
+const NotFound = inject('NotFound')
 </script>
 
 <template>
@@ -55,7 +52,7 @@ useCopyCode()
 .VPContent {
   flex-grow: 1;
   flex-shrink: 0;
-  margin: 0 auto;
+  margin: var(--vp-layout-top-height, 0px) auto 0;
   width: 100%;
 }
 
@@ -64,13 +61,17 @@ useCopyCode()
   max-width: 100%;
 }
 
+.VPContent.has-sidebar {
+  margin: 0;
+}
+
 @media (min-width: 960px) {
   .VPContent {
     padding-top: var(--vp-nav-height);
   }
 
   .VPContent.has-sidebar {
-    margin: 0;
+    margin: var(--vp-layout-top-height, 0px) 0 0;
     padding-left: var(--vp-sidebar-width);
   }
 }

@@ -6,7 +6,7 @@ import { useRouter, useRoute, useData } from 'vitepress'
 
 const router = useRouter()
 const route = useRoute()
-const { theme } = useData()
+const { theme, site } = useData()
 
 onMounted(() => {
   initialize(theme.value.algolia)
@@ -29,14 +29,17 @@ function poll() {
   }, 16)
 }
 
+const docsearch$ = docsearch.default ?? docsearch
+type DocSearchProps = Parameters<typeof docsearch$>[0]
+
 function initialize(userOptions: DefaultTheme.AlgoliaSearchOptions) {
   // note: multi-lang search support is removed since the theme
   // doesn't support multiple locales as of now.
-  const options = Object.assign({}, userOptions, {
+  const options = Object.assign<{}, {}, DocSearchProps>({}, userOptions, {
     container: '#docsearch',
 
     navigator: {
-      navigate({ itemUrl }: { itemUrl: string }) {
+      navigate({ itemUrl }) {
         const { pathname: hitPathname } = new URL(
           window.location.origin + itemUrl
         )
@@ -51,7 +54,7 @@ function initialize(userOptions: DefaultTheme.AlgoliaSearchOptions) {
       }
     },
 
-    transformItems(items: any[]) {
+    transformItems(items) {
       return items.map((item) => {
         return Object.assign({}, item, {
           url: getRelativePath(item.url)
@@ -59,7 +62,8 @@ function initialize(userOptions: DefaultTheme.AlgoliaSearchOptions) {
       })
     },
 
-    hitComponent({ hit, children }: { hit: any; children: any }) {
+    // @ts-expect-error vue-tsc thinks this should return Vue JSX but it returns the required React one
+    hitComponent({ hit, children }) {
       return {
         __v: null,
         type: 'a',
@@ -71,12 +75,17 @@ function initialize(userOptions: DefaultTheme.AlgoliaSearchOptions) {
     }
   })
 
-  docsearch(options)
+  docsearch$(options)
 }
 
 function getRelativePath(absoluteUrl: string) {
   const { pathname, hash } = new URL(absoluteUrl)
-  return pathname + hash
+  return (
+    pathname.replace(
+      /\.html$/,
+      site.value.cleanUrls === 'disabled' ? '.html' : ''
+    ) + hash
+  )
 }
 </script>
 

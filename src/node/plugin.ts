@@ -3,11 +3,17 @@ import c from 'picocolors'
 import { defineConfig, mergeConfig, Plugin, ResolvedConfig } from 'vite'
 import { SiteConfig } from './config'
 import { createMarkdownToVueRenderFn, clearCache } from './markdownToVue'
-import { DIST_CLIENT_PATH, APP_PATH, SITE_DATA_REQUEST_PATH } from './alias'
+import {
+  DIST_CLIENT_PATH,
+  APP_PATH,
+  SITE_DATA_REQUEST_PATH,
+  resolveAliases
+} from './alias'
 import { slash } from './utils/slash'
 import { OutputAsset, OutputChunk } from 'rollup'
 import { staticDataPlugin } from './staticDataPlugin'
 import { PageDataPayload } from './shared'
+import { webFontsPlugin } from './webFontsPlugin'
 
 const hashRE = /\.(\w+)\.js$/
 const staticInjectMarkerRE =
@@ -30,6 +36,9 @@ const isPageChunk = (
     chunk.facadeModuleId.endsWith('.md')
   )
 
+const cleanUrl = (url: string): string =>
+  url.replace(/#.*$/s, '').replace(/\?.*$/s, '')
+
 export async function createVitePressPlugin(
   siteConfig: SiteConfig,
   ssr = false,
@@ -41,13 +50,14 @@ export async function createVitePressPlugin(
     srcDir,
     configPath,
     configDeps,
-    alias,
     markdown,
     site,
     vue: userVuePluginOptions,
     vite: userViteConfig,
     pages,
-    ignoreDeadLinks
+    ignoreDeadLinks,
+    lastUpdated,
+    cleanUrls
   } = siteConfig
 
   let markdownToVue: Awaited<ReturnType<typeof createMarkdownToVueRenderFn>>
@@ -85,14 +95,16 @@ export async function createVitePressPlugin(
         config.define,
         config.command === 'build',
         config.base,
-        siteConfig.lastUpdated
+        lastUpdated,
+        cleanUrls,
+        siteConfig
       )
     },
 
     config() {
       const baseConfig = defineConfig({
         resolve: {
-          alias
+          alias: resolveAliases(siteConfig, ssr)
         },
         define: {
           __ALGOLIA__: !!site.themeConfig.algolia,
@@ -101,7 +113,7 @@ export async function createVitePressPlugin(
         optimizeDeps: {
           // force include vue to avoid duplicated copies when linked + optimized
           include: ['vue'],
-          exclude: ['@docsearch/js']
+          exclude: ['@docsearch/js', 'vitepress']
         },
         server: {
           fs: {
@@ -169,12 +181,12 @@ export async function createVitePressPlugin(
 
       // serve our index.html after vite history fallback
       return () => {
-        server.middlewares.use((req, res, next) => {
-          if (req.url!.endsWith('.html')) {
+        server.middlewares.use(async (req, res, next) => {
+          const url = req.url && cleanUrl(req.url)
+          if (url?.endsWith('.html')) {
             res.statusCode = 200
             res.setHeader('Content-Type', 'text/html')
-            res.end(`
-<!DOCTYPE html>
+            let html = `<!DOCTYPE html>
 <html>
   <head>
     <title></title>
@@ -186,7 +198,9 @@ export async function createVitePressPlugin(
     <div id="app"></div>
     <script type="module" src="/@fs/${APP_PATH}/index.js"></script>
   </body>
-</html>`)
+</html>`
+            html = await server.transformIndexHtml(url, html, req.originalUrl)
+            res.end(html)
             return
           }
           next()
@@ -219,6 +233,14 @@ export async function createVitePressPlugin(
           if (bundle[name].type === 'asset') {
             delete bundle[name]
           }
+        }
+
+        if (config.ssr?.format === 'esm') {
+          this.emitFile({
+            type: 'asset',
+            fileName: 'package.json',
+            source: '{ "private": true, "type": "module" }'
+          })
         }
       } else {
         // client build:
@@ -294,6 +316,7 @@ export async function createVitePressPlugin(
   return [
     vitePressPlugin,
     vuePlugin,
+    webFontsPlugin(siteConfig.useWebFonts),
     ...(userViteConfig?.plugins || []),
     staticDataPlugin
   ]
