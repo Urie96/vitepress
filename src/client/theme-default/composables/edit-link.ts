@@ -1,13 +1,18 @@
 import { computed } from 'vue'
-import { useData } from 'vitepress'
+import { useData } from './data'
 
 export function useEditLink() {
   const { theme, page } = useData()
 
   return computed(() => {
-    const { text = 'Edit this page', pattern } = theme.value.editLink || {}
+    const { text = 'Edit this page', pattern = '' } = theme.value.editLink || {}
     const { relativePath } = page.value
-    const url = pattern.replace(/:path/g, relativePath)
+    let url: string
+    if (typeof pattern === 'function') {
+      url = pattern({ relativePath })
+    } else {
+      url = pattern.replace(/:path/g, relativePath)
+    }
 
     return { url, text }
   })

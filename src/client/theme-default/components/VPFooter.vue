@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { useData } from 'vitepress'
-import { useSidebar } from '../composables/sidebar.js'
+import { useData } from '../composables/data'
+import { useSidebar } from '../composables/sidebar'
 
 const { theme } = useData()
 const { hasSidebar } = useSidebar()
@@ -19,7 +19,7 @@ const { hasSidebar } = useSidebar()
 .VPFooter {
   position: relative;
   z-index: var(--vp-z-index-footer);
-  border-top: 1px solid var(--vp-c-divider-light);
+  border-top: 1px solid var(--vp-c-gutter);
   padding: 32px 24px;
   background-color: var(--vp-c-bg);
 }

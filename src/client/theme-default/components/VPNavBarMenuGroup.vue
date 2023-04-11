@@ -1,7 +1,7 @@
 <script lang="ts" setup>
-import { useData } from 'vitepress'
 import type { DefaultTheme } from 'vitepress/theme'
-import { isActive } from '../support/utils.js'
+import { useData } from '../composables/data'
+import { isActive } from '../support/utils'
 import VPFlyout from './VPFlyout.vue'
 
 defineProps<{

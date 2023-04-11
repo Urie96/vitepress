@@ -1,31 +1,20 @@
 import fs from 'fs'
 import path from 'path'
-import MarkdownIt from 'markdown-it'
-import { RuleBlock } from 'markdown-it/lib/parser_block'
+import type MarkdownIt from 'markdown-it'
+import type { RuleBlock } from 'markdown-it/lib/parser_block'
 
-function dedent(text: string) {
-  const wRegexp = /^([ \t]*)(.*)\n/gm
-  let match
-  let minIndentLength = null
+export function dedent(text: string): string {
+  const lines = text.split('\n')
 
-  while ((match = wRegexp.exec(text)) !== null) {
-    const [indentation, content] = match.slice(1)
-    if (!content) continue
+  const minIndentLength = lines.reduce((acc, line) => {
+    for (let i = 0; i < line.length; i++) {
+      if (line[i] !== ' ' && line[i] !== '\t') return Math.min(i, acc)
+    }
+    return acc
+  }, Infinity)
 
-    const indentLength = indentation.length
-    if (indentLength > 0) {
-      minIndentLength =
-        minIndentLength !== null
-          ? Math.min(minIndentLength, indentLength)
-          : indentLength
-    } else break
-  }
-
-  if (minIndentLength) {
-    text = text.replace(
-      new RegExp(`^[ \t]{${minIndentLength}}(.*)`, 'gm'),
-      '$1'
-    )
+  if (minIndentLength < Infinity) {
+    return lines.map((x) => x.slice(minIndentLength)).join('\n')
   }
 
   return text
@@ -106,10 +95,10 @@ export const snippetPlugin = (md: MarkdownIt, srcDir: string) => {
      *    where #region and {meta} are optional
      *    and meta can be like '1,2,4-6 lang', 'lang' or '1,2,4-6'
      *
-     * captures: ['/path/to/file.extension', 'extension', '#region', '{meta}']
+     * captures: ['/path/to/file.extension', 'extension', '#region', '{meta}', '[title]']
      */
     const rawPathRegexp =
-      /^(.+(?:\.([a-z]+)))(?:(#[\w-]+))?(?: ?(?:{(\d+(?:[,-]\d+)*)? ?(\S+)?}))?$/
+      /^(.+(?:\.([a-z0-9]+)))(?:(#[\w-]+))?(?: ?(?:{(\d+(?:[,-]\d+)*)? ?(\S+)?}))? ?(?:\[(.+)\])?$/
 
     const rawPath = state.src
       .slice(start, end)
@@ -117,13 +106,23 @@ export const snippetPlugin = (md: MarkdownIt, srcDir: string) => {
       .replace(/^@/, srcDir)
       .trim()
 
-    const [filename = '', extension = '', region = '', lines = '', lang = ''] =
-      (rawPathRegexp.exec(rawPath) || []).slice(1)
+    const [
+      filename = '',
+      extension = '',
+      region = '',
+      lines = '',
+      lang = '',
+      rawTitle = ''
+    ] = (rawPathRegexp.exec(rawPath) || []).slice(1)
+
+    const title = rawTitle || filename.split('/').pop() || ''
 
     state.line = startLine + 1
 
     const token = state.push('fence', 'code', 0)
-    token.info = `${lang || extension}${lines ? `{${lines}}` : ''}`
+    token.info = `${lang || extension}${lines ? `{${lines}}` : ''}${
+      title ? `[${title}]` : ''
+    }`
 
     // @ts-ignore
     token.src = path.resolve(filename) + region

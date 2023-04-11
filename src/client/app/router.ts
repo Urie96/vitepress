@@ -1,9 +1,9 @@
 import { reactive, inject, markRaw, nextTick, readonly } from 'vue'
 import type { Component, InjectionKey } from 'vue'
-import { notFoundPageData } from '../shared.js'
-import type { PageData, PageDataPayload, Awaitable } from '../shared.js'
-import { inBrowser, withBase } from './utils.js'
-import { siteDataRef } from './data.js'
+import { notFoundPageData } from '../shared'
+import type { PageData, PageDataPayload, Awaitable } from '../shared'
+import { inBrowser, withBase } from './utils'
+import { siteDataRef } from './data'
 
 export interface Route {
   path: string
@@ -51,7 +51,7 @@ export function createRouter(
   async function go(href: string = inBrowser ? location.href : '/') {
     await router.onBeforeRouteChange?.(href)
     const url = new URL(href, fakeHost)
-    if (siteDataRef.value.cleanUrls === 'disabled') {
+    if (!siteDataRef.value.cleanUrls) {
       // ensure correct deep link so page refresh lands on correct files.
       // if cleanUrls is enabled, the server should handle this
       if (!url.pathname.endsWith('/') && !url.pathname.endsWith('.html')) {
@@ -59,7 +59,7 @@ export function createRouter(
         href = url.pathname + url.search + url.hash
       }
     }
-    if (inBrowser) {
+    if (inBrowser && href !== location.href) {
       // save scroll position before changing url
       history.replaceState({ scrollPosition: window.scrollY }, document.title)
       history.pushState(null, '', href)
@@ -92,6 +92,18 @@ export function createRouter(
 
         if (inBrowser) {
           nextTick(() => {
+            let actualPathname =
+              siteDataRef.value.base +
+              __pageData.relativePath.replace(/(?:(^|\/)index)?\.md$/, '$1')
+            if (!siteDataRef.value.cleanUrls && !actualPathname.endsWith('/')) {
+              actualPathname += '.html'
+            }
+            if (actualPathname !== targetLoc.pathname) {
+              targetLoc.pathname = actualPathname
+              href = actualPathname + targetLoc.search + targetLoc.hash
+              history.replaceState(null, '', href)
+            }
+
             if (targetLoc.hash && !scrollPosition) {
               let target: HTMLElement | null = null
               try {
@@ -144,9 +156,21 @@ export function createRouter(
         const button = (e.target as Element).closest('button')
         if (button) return
 
-        const link = (e.target as Element).closest('a')
-        if (link && !link.closest('.vp-raw') && !link.download) {
-          const { href, origin, pathname, hash, search, target } = link
+        const link = (e.target as Element | SVGElement).closest<
+          HTMLAnchorElement | SVGAElement
+        >('a')
+        if (
+          link &&
+          !link.closest('.vp-raw') &&
+          (link instanceof SVGElement || !link.download)
+        ) {
+          const { target } = link
+          const { href, origin, pathname, hash, search } = new URL(
+            link.href instanceof SVGAnimatedString
+              ? link.href.animVal
+              : link.href,
+            link.baseURI
+          )
           const currentUrl = window.location
           const extMatch = pathname.match(/\.\w+$/)
           // only intercept inbound links
@@ -208,8 +232,8 @@ export function useRoute(): Route {
   return useRouter().route
 }
 
-function scrollTo(el: HTMLElement, hash: string, smooth = false) {
-  let target: HTMLElement | null = null
+export function scrollTo(el: Element, hash: string, smooth = false) {
+  let target: Element | null = null
 
   try {
     target = el.classList.contains('header-anchor')
@@ -220,10 +244,20 @@ function scrollTo(el: HTMLElement, hash: string, smooth = false) {
   }
 
   if (target) {
-    let offset = siteDataRef.value.scrollOffset
-    if (typeof offset === 'string') {
-      offset =
-        document.querySelector(offset)!.getBoundingClientRect().bottom + 24
+    const scrollOffset = siteDataRef.value.scrollOffset
+    let offset: number = 0
+    if (typeof scrollOffset === 'number') {
+      offset = scrollOffset
+    } else if (typeof scrollOffset === 'string') {
+      offset = tryOffsetSelector(scrollOffset)
+    } else if (Array.isArray(scrollOffset)) {
+      for (const selector of scrollOffset) {
+        const res = tryOffsetSelector(selector)
+        if (res) {
+          offset = res
+          break
+        }
+      }
     }
     const targetPadding = parseInt(
       window.getComputedStyle(target).paddingTop,
@@ -245,6 +279,14 @@ function scrollTo(el: HTMLElement, hash: string, smooth = false) {
       })
     }
   }
+}
+
+function tryOffsetSelector(selector: string): number {
+  const el = document.querySelector(selector)
+  if (!el) return 0
+  const bot = el.getBoundingClientRect().bottom
+  if (bot < 0) return 0
+  return bot + 24
 }
 
 function handleHMR(route: Route): void {

@@ -1,5 +1,5 @@
 import dns from 'dns'
-import { createServer as createViteServer, ServerOptions } from 'vite'
+import { createServer as createViteServer, type ServerOptions } from 'vite'
 import { resolveConfig } from './config'
 import { createVitePressPlugin } from './plugin'
 
@@ -20,8 +20,9 @@ export async function createServer(
   return createViteServer({
     root: config.srcDir,
     base: config.site.base,
-    // logLevel: 'warn',
+    cacheDir: config.cacheDir,
     plugins: await createVitePressPlugin(config, false, {}, {}, recreateServer),
-    server: serverOptions
+    server: serverOptions,
+    customLogger: config.logger
   })
 }

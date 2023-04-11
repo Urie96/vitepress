@@ -1,19 +1,35 @@
 import path from 'path'
 import c from 'picocolors'
-import { defineConfig, mergeConfig, Plugin, ResolvedConfig } from 'vite'
-import { SiteConfig } from './config'
-import { createMarkdownToVueRenderFn, clearCache } from './markdownToVue'
+import { slash } from './utils/slash'
+import type { OutputAsset, OutputChunk } from 'rollup'
 import {
-  DIST_CLIENT_PATH,
+  mergeConfig,
+  searchForWorkspaceRoot,
+  type Plugin,
+  type ResolvedConfig,
+  type UserConfig
+} from 'vite'
+import {
   APP_PATH,
+  DIST_CLIENT_PATH,
   SITE_DATA_REQUEST_PATH,
   resolveAliases
 } from './alias'
-import { slash } from './utils/slash'
-import { OutputAsset, OutputChunk } from 'rollup'
-import { staticDataPlugin } from './staticDataPlugin'
-import { PageDataPayload } from './shared'
-import { webFontsPlugin } from './webFontsPlugin'
+import { resolveUserConfig, resolvePages, type SiteConfig } from './config'
+import { clearCache, createMarkdownToVueRenderFn } from './markdownToVue'
+import type { PageDataPayload } from './shared'
+import { staticDataPlugin } from './plugins/staticDataPlugin'
+import { webFontsPlugin } from './plugins/webFontsPlugin'
+import { dynamicRoutesPlugin } from './plugins/dynamicRoutesPlugin'
+import { rewritesPlugin } from './plugins/rewritesPlugin'
+import { localSearchPlugin } from './plugins/localSearchPlugin.js'
+import { serializeFunctions, deserializeFunctions } from './utils/fnSerialize'
+
+declare module 'vite' {
+  interface UserConfig {
+    vitepress?: SiteConfig
+  }
+}
 
 const hashRE = /\.(\w+)\.js$/
 const staticInjectMarkerRE =
@@ -55,7 +71,6 @@ export async function createVitePressPlugin(
     vue: userVuePluginOptions,
     vite: userViteConfig,
     pages,
-    ignoreDeadLinks,
     lastUpdated,
     cleanUrls
   } = siteConfig
@@ -102,7 +117,7 @@ export async function createVitePressPlugin(
     },
 
     config() {
-      const baseConfig = defineConfig({
+      const baseConfig: UserConfig = {
         resolve: {
           alias: resolveAliases(siteConfig, ssr)
         },
@@ -117,12 +132,17 @@ export async function createVitePressPlugin(
         },
         server: {
           fs: {
-            allow: [DIST_CLIENT_PATH, srcDir, process.cwd()]
+            allow: [
+              DIST_CLIENT_PATH,
+              srcDir,
+              searchForWorkspaceRoot(process.cwd())
+            ]
           }
-        }
-      })
+        },
+        vitepress: siteConfig
+      }
       return userViteConfig
-        ? mergeConfig(userViteConfig, baseConfig)
+        ? mergeConfig(baseConfig, userViteConfig)
         : baseConfig
     },
 
@@ -138,10 +158,17 @@ export async function createVitePressPlugin(
         // head info is not needed by the client in production build
         if (config.command === 'build') {
           data = { ...siteData, head: [] }
+          // in production client build, the data is inlined on each page
+          // to avoid config changes invalidating every chunk.
+          if (!ssr) {
+            return `export default window.__VP_SITE_DATA__`
+          }
         }
-        return `export default JSON.parse(${JSON.stringify(
+        data = serializeFunctions(data)
+        return `${deserializeFunctions.toString()}
+        export default deserializeFunctions(JSON.parse(${JSON.stringify(
           JSON.stringify(data)
-        )})`
+        )}))`
       }
     },
 
@@ -168,7 +195,7 @@ export async function createVitePressPlugin(
     },
 
     renderStart() {
-      if (hasDeadLinks && !ignoreDeadLinks) {
+      if (hasDeadLinks) {
         throw new Error(`One or more pages contain dead links.`)
       }
     },
@@ -178,6 +205,17 @@ export async function createVitePressPlugin(
         server.watcher.add(configPath)
         configDeps.forEach((file) => server.watcher.add(file))
       }
+
+      // update pages, dynamicRoutes and rewrites on md file add / deletion
+      const onFileAddDelete = async (file: string) => {
+        if (file.endsWith('.md')) {
+          Object.assign(
+            siteConfig,
+            await resolvePages(siteConfig.srcDir, siteConfig.userConfig)
+          )
+        }
+      }
+      server.watcher.on('add', onFileAddDelete).on('unlink', onFileAddDelete)
 
       // serve our index.html after vite history fallback
       return () => {
@@ -269,20 +307,24 @@ export async function createVitePressPlugin(
     async handleHotUpdate(ctx) {
       const { file, read, server } = ctx
       if (file === configPath || configDeps.includes(file)) {
-        console.log(
+        siteConfig.logger.info(
           c.green(
-            `\n${path.relative(
+            `${path.relative(
               process.cwd(),
               file
-            )} changed, restarting server...`
-          )
+            )} changed, restarting server...\n`
+          ),
+          { clear: true, timestamp: true }
         )
+
         try {
-          clearCache()
-          await recreateServer?.()
-        } catch (err) {
-          console.error(c.red(`failed to restart server. error:\n`), err)
+          await resolveUserConfig(siteConfig.root, 'serve', 'development')
+        } catch (err: any) {
+          return
         }
+
+        clearCache()
+        await recreateServer?.()
         return
       }
 
@@ -315,9 +357,12 @@ export async function createVitePressPlugin(
 
   return [
     vitePressPlugin,
+    rewritesPlugin(siteConfig),
     vuePlugin,
     webFontsPlugin(siteConfig.useWebFonts),
     ...(userViteConfig?.plugins || []),
-    staticDataPlugin
+    await localSearchPlugin(siteConfig),
+    staticDataPlugin,
+    await dynamicRoutesPlugin(siteConfig)
   ]
 }

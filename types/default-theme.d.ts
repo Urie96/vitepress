@@ -1,3 +1,6 @@
+import { DocSearchProps } from './docsearch.js'
+import { LocalSearchTranslations } from './local-search.js'
+
 export namespace DefaultTheme {
   export interface Config {
     /**
@@ -18,10 +21,11 @@ export namespace DefaultTheme {
      *
      * @default 2
      */
-    outline?: number | [number, number] | 'deep' | false
+    outline?: Outline | Outline['level'] | false
 
     /**
-     * Custom outline title in the aside component.
+     * @deprecated
+     * Use `outline.label` instead.
      *
      * @default 'On this page'
      */
@@ -36,6 +40,15 @@ export namespace DefaultTheme {
      * The sidebar items.
      */
     sidebar?: Sidebar
+
+    /**
+     * Set to `false` to prevent rendering of aside container.
+     * Set to `true` to render the aside to the right.
+     * Set to `left` to render the aside to the left.
+     *
+     * @default true
+     */
+    aside?: boolean | 'left'
 
     /**
      * Info for the edit link. If it's undefined, the edit link feature will
@@ -67,10 +80,26 @@ export namespace DefaultTheme {
     footer?: Footer
 
     /**
-     * Adds locale menu to the nav. This option should be used when you have
-     * your translated sites outside of the project.
+     * @default 'Appearance'
      */
-    localeLinks?: LocaleLinks
+    darkModeSwitchLabel?: string
+
+    /**
+     * @default 'Menu'
+     */
+    sidebarMenuLabel?: string
+
+    /**
+     * @default 'Return to top'
+     */
+    returnToTopLabel?: string
+
+    /**
+     * Set custom `aria-label` for language menu button.
+     *
+     * @default 'Change language'
+     */
+    langMenuLabel?: string
 
     /**
      * The algolia options. Leave it undefined to disable the search feature.
@@ -78,16 +107,28 @@ export namespace DefaultTheme {
     algolia?: AlgoliaSearchOptions
 
     /**
+     * The local search options. Set to `true` or an object to enable, `false` to disable.
+     */
+    localSearch?: LocalSearchOptions | boolean
+
+    /**
      * The carbon ads options. Leave it undefined to disable the ads feature.
      */
     carbonAds?: CarbonAdsOptions
+
+    /**
+     * Changing locale when current url is `/foo` will redirect to `/locale/foo`.
+     *
+     * @default true
+     */
+    i18nRouting?: boolean
   }
 
   // nav -----------------------------------------------------------------------
 
   export type NavItem = NavItemWithLink | NavItemWithChildren
 
-  export type NavItemWithLink = {
+  export interface NavItemWithLink {
     text: string
     link: string
 
@@ -96,9 +137,11 @@ export namespace DefaultTheme {
      * RegExp object here because it isn't serializable
      */
     activeMatch?: string
+    target?: string
+    rel?: string
   }
 
-  export type NavItemChildren = {
+  export interface NavItemChildren {
     text?: string
     items: NavItemWithLink[]
   }
@@ -114,43 +157,57 @@ export namespace DefaultTheme {
     activeMatch?: string
   }
 
-  // image -----------------------------------------------------------------------
+  // image ---------------------------------------------------------------------
 
   export type ThemeableImage =
-    | Image
-    | { light: Image; dark: Image; alt?: string }
-  export type Image = string | { src: string; alt?: string }
+    | string
+    | { src: string; alt?: string }
+    | { light: string; dark: string; alt?: string }
+
+  export type FeatureIcon =
+    | string
+    | { src: string; alt?: string; width?: string; height: string }
+    | {
+        light: string
+        dark: string
+        alt?: string
+        width?: string
+        height: string
+      }
 
   // sidebar -------------------------------------------------------------------
 
-  export type Sidebar = SidebarGroup[] | SidebarMulti
+  export type Sidebar = SidebarItem[] | SidebarMulti
 
   export interface SidebarMulti {
-    [path: string]: SidebarGroup[]
+    [path: string]: SidebarItem[]
   }
 
-  export interface SidebarGroup {
-    text?: string
-    items: SidebarItem[]
-
+  export type SidebarItem = {
     /**
-     * If `true`, toggle button is shown.
-     *
-     * @default false
+     * The text label of the item.
      */
-    collapsible?: boolean
+    text?: string
 
     /**
-     * If `true`, collapsible group is collapsed by default.
+     * The link of the item.
+     */
+    link?: string
+
+    /**
+     * The children of the item.
+     */
+    items?: SidebarItem[]
+
+    /**
+     * If not specified, group is not collapsible.
      *
-     * @default false
+     * If `true`, group is collapsible and collapsed by default
+     *
+     * If `false`, group is collapsible but expanded by default
      */
     collapsed?: boolean
   }
-
-  export type SidebarItem =
-    | { text: string; link: string }
-    | { text: string; link?: string; items: SidebarItem[] }
 
   // edit link -----------------------------------------------------------------
 
@@ -160,7 +217,7 @@ export namespace DefaultTheme {
      *
      * @example 'https://github.com/vuejs/vitepress/edit/main/docs/:path'
      */
-    pattern: string
+    pattern: string | ((payload: { relativePath: string }) => string)
 
     /**
      * Custom text for edit link.
@@ -201,6 +258,7 @@ export namespace DefaultTheme {
     | 'github'
     | 'instagram'
     | 'linkedin'
+    | 'mastodon'
     | 'slack'
     | 'twitter'
     | 'youtube'
@@ -226,33 +284,28 @@ export namespace DefaultTheme {
     sponsor?: string
   }
 
-  // locales -------------------------------------------------------------------
+  // outline -------------------------------------------------------------------
 
-  export interface LocaleLinks {
-    text: string
-    items: LocaleLink[]
+  export interface Outline {
+    level?: number | [number, number] | 'deep'
+    label?: string
   }
 
-  export interface LocaleLink {
-    text: string
-    link: string
-  }
-
-  // algolia ------------------------------------------------------------------
+  // algolia -------------------------------------------------------------------
 
   /**
    * The Algolia search options. Partially copied from
    * `@docsearch/react/dist/esm/DocSearch.d.ts`
    */
-  export interface AlgoliaSearchOptions {
-    appId: string
-    apiKey: string
-    indexName: string
-    placeholder?: string
-    searchParameters?: any
-    disableUserPersonalization?: boolean
-    initialQuery?: string
-    buttonText?: string
+  export interface AlgoliaSearchOptions extends DocSearchProps {
+    locales?: Record<string, Partial<DocSearchProps>>
+  }
+
+  // local search ------------------------------------------------------------
+
+  export interface LocalSearchOptions {
+    translations?: LocalSearchTranslations
+    locales?: Record<string, Partial<Omit<LocalSearchOptions, 'locales'>>>
   }
 
   // carbon ads ----------------------------------------------------------------
