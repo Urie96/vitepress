@@ -1,0 +1,68 @@
+[
+  {
+    "scope": ["zsh.root"],
+    "settings": {
+      "foreground": "#78e83d"
+    }
+  },
+  {
+    "scope": ["zsh.function"],
+    "settings": {
+      "foreground": "#48c53d"
+    }
+  },
+  {
+    "scope": ["zsh.flag"],
+    "settings": {
+      "foreground": "#d7ba7d"
+    }
+  },
+  {
+    "scope": ["zsh.comment"],
+    "settings": {
+      "foreground": "#999"
+    }
+  },
+  {
+    "scope": ["zsh.operator"],
+    "settings": {
+      "foreground": "#67cdcc"
+    }
+  },
+  {
+    "scope": ["zsh.environ"],
+    "settings": {
+      "foreground": "#569CD6"
+    }
+  },
+  {
+    "scope": ["zsh.string"],
+    "settings": {
+      "foreground": "#CE9178"
+    }
+  },
+  {
+    "scope": ["zsh.normal"],
+    "settings": {
+      "foreground": "#FFF"
+    }
+  },
+  {
+    "scope": ["zsh.backquote"],
+    "settings": {
+      "foreground": "#cc33ff"
+    }
+  },
+  {
+    "scope": ["zsh.signal"],
+    "settings": {
+      "foreground": "#d16969"
+    }
+  },
+  {
+    "scope": ["zsh.command"],
+    "settings": {
+      "foreground": "#ccffff"
+    }
+  }
+]

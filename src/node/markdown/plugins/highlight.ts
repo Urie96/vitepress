@@ -18,6 +18,9 @@ import {
 } from 'shiki-processor'
 import type { Logger } from 'vite'
 import type { ThemeOptions } from '../markdown'
+import httpGrammar from './http_grammer.json'
+import zshGrammer from './zsh_grammer.json'
+import zshTheme from './zsh_theme.json'
 
 const nanoid = customAlphabet('abcdefghijklmnopqrstuvwxyz', 10)
 
@@ -78,11 +81,29 @@ export async function highlight(
     errorLevelProcessor
   ]
 
-  const highlighter = await getHighlighter({
-    themes: hasSingleTheme ? [theme] : [theme.dark, theme.light],
+  let highlighter = await getHighlighter({
+    themes: hasSingleTheme ? [theme] : [theme.dark]
+  })
+  const shikiTheme = highlighter.getTheme()
+  shikiTheme.settings.push(...zshTheme)
+
+  highlighter = await getHighlighter({
+    themes: hasSingleTheme ? [shikiTheme] : [theme.light, shikiTheme],
     langs: [...BUNDLED_LANGUAGES, ...languages],
     processors
   })
+  const _httpGrammer = httpGrammar
+  await highlighter.loadLanguage({
+    id: 'http',
+    scopeName: 'source.http',
+    grammar: _httpGrammer
+  } as any)
+  const _zshGrammer = zshGrammer
+  await highlighter.loadLanguage({
+    id: 'zsh',
+    scopeName: 'source.zsh',
+    grammar: _zshGrammer
+  } as any)
 
   const styleRE = /<pre[^>]*(style=".*?")/
   const preRE = /^<pre(.*?)>/
@@ -151,6 +172,9 @@ export async function highlight(
     str = removeMustache(str).trim()
 
     const codeToHtml = (theme: IThemeRegistration) => {
+      if (lang === 'zsh') {
+        str = str.replaceAll(/(?<=\n|^)\s*\$/g, '❯')
+      }
       const res =
         lang === 'ansi'
           ? highlighter.ansiToHtml(str, {

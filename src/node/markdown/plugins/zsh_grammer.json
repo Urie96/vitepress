@@ -1,0 +1,219 @@
+{
+  "scopeName": "source.zsh",
+  "fileTypes": ["zsh"],
+  "keyEquivalent": "^~H",
+  "name": "zsh",
+  "patterns": [
+    {
+      "include": "#comments"
+    },
+    {
+      "include": "#signal"
+    },
+    {
+      "include": "#input"
+    },
+    {
+      "include": "#output"
+    }
+  ],
+  "repository": {
+    "output": {
+      "patterns": [
+        {
+          "begin": "(?=(\\{(\"|\\n))|(\\[(\"|\\n)))",
+          "end": "(?<=\\}|\\])",
+          "patterns": [
+            {
+              "include": "source.json"
+            }
+          ]
+        }
+      ]
+    },
+    "input": {
+      "patterns": [
+        {
+          "begin": "^(\\$|❯)",
+          "beginCaptures": {
+            "1": {
+              "name": "zsh.root"
+            }
+          },
+          "end": "(?<!\\\\\\s*)$",
+          "patterns": [
+            {
+              "include": "#command"
+            },
+            {
+              "include": "#comments"
+            }
+          ]
+        }
+      ]
+    },
+    "command": {
+      "patterns": [
+        {
+          "begin": "([a-zA-Z0-9-_./]+(=)(\\S+)\\s+)?([a-zA-Z0-9-_./]+)",
+          "beginCaptures": {
+            "1": {
+              "name": "zsh.environ"
+            },
+            "2": {
+              "name": "zsh.operator"
+            },
+            "3": {
+              "name": "zsh.string"
+            },
+            "4": {
+              "name": "zsh.function"
+            }
+          },
+          "end": "(&&)|(\\|{1,2})|;|((?<!\\\\\\s*)$)",
+          "endCaptures": {
+            "0": {
+              "name": "zsh.operator"
+            }
+          },
+          "name": "zsh.command",
+          "patterns": [
+            {
+              "include": "#backquote"
+            },
+            {
+              "include": "#flag"
+            },
+            {
+              "include": "#comments"
+            },
+            {
+              "include": "#environ"
+            },
+            {
+              "include": "#string"
+            },
+            {
+              "include": "#operator"
+            }
+          ]
+        }
+      ]
+    },
+    "operator": {
+      "match": "&|\\||&|>|<|;|\\\\|=|\\?|\\*|%",
+      "name": "zsh.operator"
+    },
+    "flag": {
+      "patterns": [
+        {
+          "begin": "\\s(-{1,2}[a-zA-Z0-9-_]+)(=)?",
+          "beginCaptures": {
+            "1": {
+              "name": "zsh.flag"
+            },
+            "2": {
+              "name": "zsh.operator"
+            }
+          },
+          "end": "(?=\\s)",
+          "name": "zsh.string",
+          "patterns": [
+            {
+              "include": "#string"
+            }
+          ]
+        }
+      ]
+    },
+    "comments": {
+      "patterns": [
+        {
+          "match": "\\s*\\#.*$",
+          "name": "zsh.comment"
+        }
+      ]
+    },
+    "string": {
+      "patterns": [
+        {
+          "include": "#qstring-single"
+        },
+        {
+          "include": "#qstring-double"
+        }
+      ]
+    },
+    "qstring-single": {
+      "patterns": [
+        {
+          "begin": "'",
+          "end": "'",
+          "name": "zsh.string",
+          "patterns": [
+            {
+              "include": "#string-character-escape"
+            },
+            {
+              "include": "#backquote"
+            }
+          ]
+        }
+      ]
+    },
+    "qstring-double": {
+      "patterns": [
+        {
+          "begin": "\"",
+          "end": "\"",
+          "name": "zsh.string",
+          "patterns": [
+            {
+              "include": "#string-character-escape"
+            },
+            {
+              "include": "#environ"
+            },
+            {
+              "include": "#backquote"
+            }
+          ]
+        }
+      ]
+    },
+    "string-character-escape": {
+      "name": "zsh.flag",
+      "match": "\\\\(x\\h{2}|[0-2][0-7]{0,2}|3[0-6][0-7]?|37[0-7]?|[4-7][0-7]?|.|$)"
+    },
+    "environ": {
+      "name": "zsh.environ",
+      "match": "\\$[a-zA-Z0-9_-]+"
+    },
+    "backquote": {
+      "patterns": [
+        {
+          "match": "`\\s*([a-zA-Z0-9-_./]+)\\s*([a-zA-Z0-9-_./]*)`",
+          "captures": {
+            "0": {
+              "name": "zsh.backquote"
+            },
+            "1": {
+              "name": "zsh.function"
+            },
+            "2": {
+              "name": "zsh.normal"
+            }
+          }
+        }
+      ]
+    },
+    "signal": {
+      "patterns": [
+        {
+          "match": "^\\s*\\^[CZ]\\s*$",
+          "name": "zsh.signal"
+        }
+      ]
+    }
+  }
+}
