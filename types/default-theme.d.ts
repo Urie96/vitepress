@@ -1,5 +1,6 @@
-import { DocSearchProps } from './docsearch.js'
-import { LocalSearchTranslations } from './local-search.js'
+import type { DocSearchProps } from './docsearch.js'
+import type { LocalSearchTranslations } from './local-search.js'
+import type { PageData } from './shared.js'
 
 export namespace DefaultTheme {
   export interface Config {
@@ -101,15 +102,14 @@ export namespace DefaultTheme {
      */
     langMenuLabel?: string
 
-    /**
-     * The algolia options. Leave it undefined to disable the search feature.
-     */
-    algolia?: AlgoliaSearchOptions
+    search?:
+      | { provider: 'local'; options?: LocalSearchOptions }
+      | { provider: 'algolia'; options: AlgoliaSearchOptions }
 
     /**
-     * The local search options. Set to `true` or an object to enable, `false` to disable.
+     * @deprecated Use `search` instead.
      */
-    localSearch?: LocalSearchOptions | boolean
+    algolia?: AlgoliaSearchOptions
 
     /**
      * The carbon ads options. Leave it undefined to disable the ads feature.
@@ -216,8 +216,9 @@ export namespace DefaultTheme {
      * Pattern for edit link.
      *
      * @example 'https://github.com/vuejs/vitepress/edit/main/docs/:path'
+     * @example ({ filePath }) => { ... }
      */
-    pattern: string | ((payload: { relativePath: string }) => string)
+    pattern: string | ((payload: PageData) => string)
 
     /**
      * Custom text for edit link.
@@ -291,6 +292,23 @@ export namespace DefaultTheme {
     label?: string
   }
 
+  // local search --------------------------------------------------------------
+
+  export interface LocalSearchOptions {
+    /**
+     * @default false
+     */
+    disableDetailedView?: boolean
+
+    /**
+     * @default false
+     */
+    disableQueryPersistence?: boolean
+
+    translations?: LocalSearchTranslations
+    locales?: Record<string, Partial<Omit<LocalSearchOptions, 'locales'>>>
+  }
+
   // algolia -------------------------------------------------------------------
 
   /**
@@ -299,13 +317,6 @@ export namespace DefaultTheme {
    */
   export interface AlgoliaSearchOptions extends DocSearchProps {
     locales?: Record<string, Partial<DocSearchProps>>
-  }
-
-  // local search ------------------------------------------------------------
-
-  export interface LocalSearchOptions {
-    translations?: LocalSearchTranslations
-    locales?: Record<string, Partial<Omit<LocalSearchOptions, 'locales'>>>
   }
 
   // carbon ads ----------------------------------------------------------------

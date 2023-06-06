@@ -7,11 +7,10 @@ import {
   type UserConfig as ViteUserConfig
 } from 'vite'
 import type { GetModuleInfo, RollupOutput } from 'rollup'
-import { slash } from '../utils/slash'
 import type { SiteConfig } from '../config'
 import { APP_PATH } from '../alias'
 import { createVitePressPlugin } from '../plugin'
-import { sanitizeFileName } from '../shared'
+import { sanitizeFileName, slash } from '../shared'
 import { buildMPAClient } from './buildMPAClient'
 import { fileURLToPath } from 'url'
 import { normalizePath } from 'vite'
@@ -21,7 +20,7 @@ export const failMark = '\x1b[31m✖\x1b[0m'
 
 // A list of default theme components that should only be loaded on demand.
 const lazyDefaultThemeComponentsRE =
-  /VP(HomeSponsors|DocAsideSponsors|TeamPage|TeamMembers|AlgoliaSearch|CarbonAds|DocAsideCarbonAds)/
+  /VP(HomeSponsors|DocAsideSponsors|TeamPage|TeamMembers|LocalSearchBox|AlgoliaSearchBox|CarbonAds|DocAsideCarbonAds)/
 
 const clientDir = normalizePath(
   path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../client')
@@ -58,7 +57,7 @@ export async function bundle(
     root: config.srcDir,
     cacheDir: config.cacheDir,
     base: config.site.base,
-    logLevel: 'warn',
+    logLevel: config.vite?.logLevel ?? 'warn',
     plugins: await createVitePressPlugin(
       config,
       ssr,
@@ -166,13 +165,15 @@ export async function bundle(
   if (config.mpa) {
     // in MPA mode, we need to copy over the non-js asset files from the
     // server build since there is no client-side build.
-    for (const chunk of serverResult.output) {
-      if (!chunk.fileName.endsWith('.js')) {
-        const tempPath = path.resolve(config.tempDir, chunk.fileName)
-        const outPath = path.resolve(config.outDir, chunk.fileName)
-        await fs.copy(tempPath, outPath)
-      }
-    }
+    await Promise.all(
+      serverResult.output.map(async (chunk) => {
+        if (!chunk.fileName.endsWith('.js')) {
+          const tempPath = path.resolve(config.tempDir, chunk.fileName)
+          const outPath = path.resolve(config.outDir, chunk.fileName)
+          await fs.copy(tempPath, outPath)
+        }
+      })
+    )
     // also copy over public dir
     const publicDir = path.resolve(config.srcDir, 'public')
     if (fs.existsSync(publicDir)) {

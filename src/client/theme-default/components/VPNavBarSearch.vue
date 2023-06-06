@@ -8,16 +8,17 @@ import {
   onUnmounted,
   ref
 } from 'vue'
+import type { DefaultTheme } from '../../shared'
 import { useData } from '../composables/data'
 import VPNavBarSearchButton from './VPNavBarSearchButton.vue'
+
+const VPLocalSearchBox = __VP_LOCAL_SEARCH__
+  ? defineAsyncComponent(() => import('./VPLocalSearchBox.vue'))
+  : () => null
 
 const VPAlgoliaSearchBox = __ALGOLIA__
   ? defineAsyncComponent(() => import('./VPAlgoliaSearchBox.vue'))
   : () => null
-
-const VPLocalSearchBox = __ALGOLIA__
-  ? () => null
-  : defineAsyncComponent(() => import('./VPLocalSearchBox.vue'))
 
 const { theme, localeIndex } = useData()
 
@@ -27,17 +28,13 @@ const { theme, localeIndex } = useData()
 const loaded = ref(false)
 
 const buttonText = computed(() => {
-  if (theme.value.algolia) {
-    return theme.value.algolia.locales?.[localeIndex.value]?.translations?.button
-      ?.buttonText ||
-      theme.value.algolia.translations?.button?.buttonText ||
-      'Search'
-  } else if (typeof theme.value.localSearch === 'object') {
-    return theme.value.localSearch.locales?.[localeIndex.value]?.translations?.button?.buttonText ||
-      theme.value.localSearch.translations?.button?.buttonText ||
-      'Search'
-  }
-  return 'Search'
+  const options = theme.value.search?.options ?? theme.value.algolia
+
+  return (
+    options?.locales?.[localeIndex.value]?.translations?.button?.buttonText ||
+    options?.translations?.button?.buttonText ||
+    'Search'
+  )
 })
 
 const preconnect = () => {
@@ -48,22 +45,28 @@ const preconnect = () => {
     const preconnect = document.createElement('link')
     preconnect.id = id
     preconnect.rel = 'preconnect'
-    preconnect.href = `https://${theme.value.algolia!.appId}-dsn.algolia.net`
+    preconnect.href = `https://${
+      ((theme.value.search?.options as DefaultTheme.AlgoliaSearchOptions) ??
+        theme.value.algolia)!.appId
+    }-dsn.algolia.net`
     preconnect.crossOrigin = ''
     document.head.appendChild(preconnect)
   })
 }
 
 onMounted(() => {
-  if (!theme.value.algolia) {
+  if (!__ALGOLIA__) {
     return
   }
 
   preconnect()
 
-  const handleSearchHotKey = (e: KeyboardEvent) => {
-    if (e.key === 'k' && (e.ctrlKey || e.metaKey)) {
-      e.preventDefault()
+  const handleSearchHotKey = (event: KeyboardEvent) => {
+    if (
+      (event.key.toLowerCase() === 'k' && (event.metaKey || event.ctrlKey)) ||
+      (!isEditingContent(event) && event.key === '/')
+    ) {
+      event.preventDefault()
       load()
       remove()
     }
@@ -101,13 +104,32 @@ function poll() {
   }, 16)
 }
 
+function isEditingContent(event: KeyboardEvent): boolean {
+  const element = event.target as HTMLElement
+  const tagName = element.tagName
+
+  return (
+    element.isContentEditable ||
+    tagName === 'INPUT' ||
+    tagName === 'SELECT' ||
+    tagName === 'TEXTAREA'
+  )
+}
+
 // Local search
 
 const showSearch = ref(false)
 
-if (!__ALGOLIA__ && theme.value.localSearch) {
-  onKeyStroke('k', event => {
+if (__VP_LOCAL_SEARCH__) {
+  onKeyStroke('k', (event) => {
     if (event.ctrlKey || event.metaKey) {
+      event.preventDefault()
+      showSearch.value = true
+    }
+  })
+
+  onKeyStroke('/', (event) => {
+    if (!isEditingContent(event)) {
       event.preventDefault()
       showSearch.value = true
     }
@@ -122,23 +144,35 @@ onMounted(() => {
     ? `'⌘'`
     : `'Ctrl'`
 })
+
+const provider = __ALGOLIA__ ? 'algolia' : __VP_LOCAL_SEARCH__ ? 'local' : ''
 </script>
 
 <template>
   <div class="VPNavBarSearch" :style="{ '--vp-meta-key': metaKey }">
-    <template v-if="theme.algolia">
-      <VPAlgoliaSearchBox v-if="loaded" :algolia="theme.algolia" />
+    <template v-if="provider === 'local'">
+      <VPLocalSearchBox
+        v-if="showSearch"
+        :placeholder="buttonText"
+        @close="showSearch = false"
+      />
+
+      <div id="local-search">
+        <VPNavBarSearchButton
+          :placeholder="buttonText"
+          @click="showSearch = true"
+        />
+      </div>
+    </template>
+
+    <template v-else-if="provider === 'algolia'">
+      <VPAlgoliaSearchBox
+        v-if="loaded"
+        :algolia="theme.search?.options ?? theme.algolia"
+      />
 
       <div v-else id="docsearch">
         <VPNavBarSearchButton :placeholder="buttonText" @click="load" />
-      </div>
-    </template>
-    
-    <template v-else-if="theme.localSearch">
-      <VPLocalSearchBox v-if="showSearch" :placeholder="buttonText" @close="showSearch = false" />
-
-      <div id="local-search">
-        <VPNavBarSearchButton :placeholder="buttonText" @click="showSearch = true" />
       </div>
     </template>
   </div>

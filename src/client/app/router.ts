@@ -190,10 +190,13 @@ export function createRouter(
               search === currentUrl.search
             ) {
               // scroll between hash anchors in the same page
-              if (hash && hash !== currentUrl.hash) {
-                history.pushState(null, '', hash)
-                // still emit the event so we can listen to it in themes
-                window.dispatchEvent(new Event('hashchange'))
+              if (hash) {
+                // avoid duplicate history entries when the hash is same
+                if (hash !== currentUrl.hash) {
+                  history.pushState(null, '', hash)
+                  // still emit the event so we can listen to it in themes
+                  window.dispatchEvent(new Event('hashchange'))
+                }
                 // use smooth scroll when clicking on header anchor links
                 scrollTo(link, hash, link.classList.contains('header-anchor'))
               }
@@ -293,7 +296,7 @@ function handleHMR(route: Route): void {
   // update route.data on HMR updates of active page
   if (import.meta.hot) {
     // hot reload pageData
-    import.meta.hot!.on('vitepress:pageData', (payload: PageDataPayload) => {
+    import.meta.hot.on('vitepress:pageData', (payload: PageDataPayload) => {
       if (shouldHotReload(payload)) {
         route.data = payload.pageData
       }
@@ -303,6 +306,8 @@ function handleHMR(route: Route): void {
 
 function shouldHotReload(payload: PageDataPayload): boolean {
   const payloadPath = payload.path.replace(/(\bindex)?\.md$/, '')
-  const locationPath = location.pathname.replace(/(\bindex)?\.html$/, '')
+  const locationPath = location.pathname
+    .replace(/(\bindex)?\.html$/, '')
+    .slice(siteDataRef.value.base.length - 1)
   return payloadPath === locationPath
 }
